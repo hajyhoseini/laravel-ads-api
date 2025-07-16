@@ -1,37 +1,51 @@
 <?php
-
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class Handler extends ExceptionHandler
 {
-    /**
-     * A list of the exception types that are not reported.
-     *
-     * @var array<int, class-string<Throwable>>
-     */
-    protected $dontReport = [
-        //
-    ];
+    public function render($request, Throwable $exception)
+{
+    if ($request->expectsJson()) {
+        if ($exception instanceof \Illuminate\Validation\ValidationException) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'اعتبارسنجی ناموفق بود',
+                'errors' => $exception->errors(),
+            ], 422);
+        }
 
-    /**
-     * A list of the inputs that are never flashed for validation exceptions.
-     *
-     * @var array<int, string>
-     */
-    protected $dontFlash = [
-        'current_password',
-        'password',
-        'password_confirmation',
-    ];
+        // می‌توانید خطاهای دیگر را هم مدیریت کنید (مثلاً خطاهای 404 یا خطاهای سرور)
+        if ($exception instanceof \Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'منبع مورد نظر یافت نشد',
+            ], 404);
+        }
 
-    /**
-     * Register the exception handling callbacks for the application.
-     *
-     * @return void
-     */
+        // خطاهای پیش‌بینی نشده
+        return response()->json([
+            'status' => 'error',
+            'message' => 'خطای سرور رخ داده است، لطفاً بعداً تلاش کنید',
+        ], 500);
+    }
+
+    return parent::render($request, $exception);
+}
+
+
+    protected function invalidJson($request, ValidationException $exception)
+    {
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Validation failed',
+            'errors' => $exception->errors(),
+        ], $exception->status);
+    }
+
     public function register()
     {
         $this->reportable(function (Throwable $e) {
